@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: finance-tracker-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: finance_tracker
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+
+# Quick breakdown of what each piece does:
+#
+#- **`image: postgres:16-alpine`** — pulls a lightweight PostgreSQL 16 image. Alpine is a minimal Linux distro, keeps the image small.
+#- **`ports: "5432:5432"`** — maps the container's Postgres port to your machine's port 5432, so your Spring Boot app can connect to `localhost:5432` as if Postgres were installed locally.
+#- **`environment`** — sets up the database name, username, and password. These are dev-only credentials (we'll never commit real secrets).
+#- **`volumes: pgdata`** — persists your database data. Without this, all your data would disappear every time the container stops.
+#
+# Once the file is saved, start it up:
+#
+# docker compose up -d
+#
+#
+# The `-d` flag runs it in the background. Then verify it's running with:
+#
+# docker ps

@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: finance-tracker
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/finance_tracker}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: false
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:my-super-secret-dev-key-that-is-at-least-256-bits-long-for-hs256}
+    expiration: ${JWT_EXPIRATION:900000}
+
+
+#Let me walk you through each section so you know *why* everything is there:
+#
+#  **`datasource`** — This tells Spring Boot how to connect to your PostgreSQL container.
+#  The `${DB_URL:jdbc:postgresql://...}` syntax means "use the environment variable `DB_URL`
+#  if it exists, otherwise fall back to this default." The defaults match what we set in `docker-compose.yml`.
+#  In production, you'd set real environment variables instead of relying on defaults.
+#
+#  **`jpa.hibernate.ddl-auto: validate`** — This is important. Hibernate can auto-create your database tables
+#  (`create`, `create-drop`, `update`), but that's dangerous and hides problems. Setting it to `validate` means
+#  Hibernate will only *check* that your entities match the existing schema — it won't modify the database.
+#  Flyway handles all schema changes, which gives you a controlled, versioned history. This is the production-standard approach.
+#
+#  **`show-sql` and `format_sql`** — During development, this prints the actual SQL that Hibernate generates to your console.
+#  Extremely useful for understanding what's happening under the hood and catching inefficient queries. You'd turn this off in production.
+#
+#  **`flyway.enabled: false`** — Temporary. Flyway will fail on startup if there are no migration files, and we haven't written any yet.
+#  We'll flip this to `true` in Phase 2 when we design our entities and write the migration SQL.
+#
+#  **`server.port`** — Explicitly setting 8080 even though it's the default. Makes it visible and easy to change.
+#
+#  **`app.jwt`** — Our custom properties for JWT auth. That long dev secret is a placeholder — the important thing is it's at
+#  least 256 bits for the HMAC-SHA256 algorithm we'll use later. The `900000` expiration is 15 minutes in milliseconds. Neither of these are used yet, but having the config structure in place now means less setup work when we build auth.
+#
+#
+#  After saving, run this to make sure the app compiles with the new config:
+#  ```
+#  ./mvnw clean compile
