@@ -1,6 +1,7 @@
 package com.ryanclu.finance_tracker.entity.audit;
 
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.CreatedDate;
@@ -11,10 +12,12 @@ import java.time.LocalDateTime;
 
 @Getter
 @Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
 public abstract class BaseEntity {
 
+    @EqualsAndHashCode.Include
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -56,7 +59,6 @@ save an entity, Spring Data JPA can do it for us. The @CreatedDate annotation te
 the entity is first persisted, and @LastModifiedDate auto-updates it on every save. For this to work, the class needs
 @EntityListeners(AuditingEntityListener.class) — that's the listener that intercepts persist/update events and fills in the dates.
 
-
 @Column(name = "created_at", nullable = false, updatable = false) — The name parameter explicitly sets the database column name.
 Without it, JPA would convert createdAt to created_at anyway (that's the default naming strategy), but being explicit is clearer.
 
@@ -64,7 +66,7 @@ nullable = false means the column gets a NOT NULL constraint.
 
 updatable = false tells Hibernate to never include this column in UPDATE statements — once set at creation, it shouldn't change.
 
-@Getter @Setter — Lombok generates all the getters and setters. Notice we're not using @Data here.
+@Getter @Setter — Lombok generates all the getters and setters - CONVENIENCE LAYER - recall View -> Show Bytecode. Notice we're not using @Data here.
 Remember from the reference doc — @Data generates equals() and hashCode() based on all fields, which causes problems with JPA entities.
 Lazy-loaded collections get triggered unexpectedly, and two unsaved entities would be "equal" because they both have null IDs.
 We'll handle equals/hashCode properly on each entity individually, based on the primary key only.
