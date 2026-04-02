@@ -77,3 +77,69 @@ you'll encounter. If this were a multi-timezone enterprise app, Instant would be
 Either way, the database column will be TIMESTAMP.
 
  */
+
+
+
+/*
+
+The full chain, step by step:
+
+Think of it as three layers that need to be connected for the timestamps to work.
+
+Layer 1 — The annotations on the fields.
+@CreatedDate and @LastModifiedDate are markers. They don't contain any logic themselves — they're just flags that
+say "this field should be automatically populated with a timestamp on creation" and "this field should be automatically
+populated with a timestamp on every update." By themselves, they do nothing. They're waiting for something to come along,
+read them, and act on them.
+
+Layer 2 — The EntityListener.
+@EntityListeners(AuditingEntityListener.class) is what connects JPA lifecycle events to the auditing logic.
+Here's what's happening under the hood: JPA has a lifecycle event system. Every time an entity is about to be inserted
+into the database, JPA fires a "pre-persist" event. Every time an entity is about to be updated,
+JPA fires a "pre-update" event. An EntityListener is a class that says "I want to be notified when these events happen."
+
+AuditingEntityListener is a class provided by Spring Data JPA (you're right, it's not something we wrote). When it
+receives a pre-persist event, it scans the entity for fields annotated with @CreatedDate and @LastModifiedDate, and sets
+both to the current timestamp. When it receives a pre-update event, it scans for @LastModifiedDate only and updates that
+one. The @CreatedDate field doesn't get touched on updates because we also marked it with updatable = false in the
+@Column annotation.
+
+So the flow on a new entity save is:
+your service calls repository.save(account) → Hibernate is about to execute the INSERT → JPA fires the pre-persist event →
+AuditingEntityListener receives the event → it finds createdAt annotated with @CreatedDate and sets it to LocalDateTime.now() →
+it finds lastModifiedAt annotated with @LastModifiedDate and sets it to LocalDateTime.now() → Hibernate proceeds with
+the INSERT, now with both timestamps populated.
+
+On an update: your service calls repository.save(existingAccount) → Hibernate is about to execute the UPDATE →
+JPA fires the pre-update event → AuditingEntityListener receives the event → it finds lastModifiedAt annotated with
+@LastModifiedDate and sets it to LocalDateTime.now() → createdAt is left alone → Hibernate proceeds with the UPDATE.
+
+Layer 3 — @EnableJpaAuditing.
+This is the piece that confused you, and here's why it exists. AuditingEntityListener doesn't work on its own — it depends
+on Spring's auditing infrastructure to be initialized. Specifically, it needs a Spring bean called AuditingHandler to be present
+in the application context. AuditingHandler is the object that actually does the work of reading the annotations and setting
+the values. AuditingEntityListener delegates to it.
+
+@EnableJpaAuditing tells Spring "create and register the AuditingHandler bean and all the supporting infrastructure that
+the auditing system needs." Without this annotation, no AuditingHandler bean exists. When AuditingEntityListener receives
+a lifecycle event and tries to delegate to AuditingHandler, it finds nothing and silently does nothing — your timestamp
+fields stay null.
+
+So the dependency chain is: @EnableJpaAuditing creates the AuditingHandler bean → AuditingEntityListener delegates to
+AuditingHandler when it receives lifecycle events → AuditingHandler reads @CreatedDate / @LastModifiedDate annotations
+and sets the field values.
+
+Why did Spring design it this way instead of making it "just work"? Two reasons. First, auditing is optional — not every
+Spring Data JPA application needs it, so it's opt-in rather than always-on. Second, @EnableJpaAuditing can accept
+configuration. For example, you can write @EnableJpaAuditing(auditorAwareRef = "auditorProvider") to also track who created
+or modified a record (not just when). In enterprise apps, you'd have a bean that returns the current user's ID, and
+fields annotated with @CreatedBy and @LastModifiedBy would be auto-populated with that user. We're not using that feature,
+but the infrastructure supports it — which is why the enable step is separate from the listener step.
+
+Your third point — inheritance. Exactly right. Since @EntityListeners(AuditingEntityListener.class) is on BaseEntity,
+and User, Account, Category, Transaction, and Budget all extend BaseEntity, the listener is active on all five entities.
+The @CreatedDate and @LastModifiedDate fields are inherited too. So every entity in the project automatically gets
+timestamp auditing without any additional configuration. If you later add a sixth entity that extends BaseEntity,
+it gets auditing for free.
+
+ */
