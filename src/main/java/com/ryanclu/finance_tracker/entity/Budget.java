@@ -21,7 +21,7 @@ public class Budget extends BaseEntity {
     private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "period", nullable = false, length = 10)
+    @Column(name = "budget_period", nullable = false, length = 10)
     private BudgetPeriod period;
 
     @ManyToOne(fetch = FetchType.LAZY)

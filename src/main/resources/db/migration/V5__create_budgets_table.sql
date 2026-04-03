@@ -2,7 +2,7 @@ CREATE TABLE budgets
 (
     id               BIGSERIAL PRIMARY KEY,
     amount           NUMERIC(19, 4) NOT NULL,
-    period VARCHAR (10) NOT NULL,
+    budget_period    VARCHAR(10)    NOT NULL,
     user_id          BIGINT         NOT NULL,
     category_id      BIGINT         NOT NULL,
     created_at       TIMESTAMP      NOT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE budgets
         FOREIGN KEY (category_id) REFERENCES categories (id),
 
     CONSTRAINT uq_budget_user_category_period
-        UNIQUE (user_id, category_id, period)
+        UNIQUE (user_id, category_id, budget_period)
 );
 
 
