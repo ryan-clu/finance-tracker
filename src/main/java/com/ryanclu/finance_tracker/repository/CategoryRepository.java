@@ -36,4 +36,8 @@ parameters in @Query.
 findByIdAndUserId is the same ownership pattern from AccountRepository — used
 when a user tries to edit or delete one of their custom categories.
 
+Spring Data JPA never returns null for collection return types — if no results
+are found, you get an empty list. So the emptiness of the list itself tells you
+"this user hasn't created any custom categories." Optional is for single-entity
+returns where the result might not exist.
  */
