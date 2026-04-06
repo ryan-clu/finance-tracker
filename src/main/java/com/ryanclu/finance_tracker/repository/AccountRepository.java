@@ -9,7 +9,7 @@ import java.util.Optional;
 public interface AccountRepository extends JpaRepository<Account, Long> {
 
     List<Account> findByUserId(Long userId);
-
+    // Ownership-Enforcement Method
     Optional<Account> findByIdAndUserId(Long id, Long userId);
 }
 
