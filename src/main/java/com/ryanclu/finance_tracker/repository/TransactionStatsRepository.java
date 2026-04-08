@@ -1,11 +1,12 @@
 package com.ryanclu.finance_tracker.repository;
 
+import com.ryanclu.finance_tracker.dto.response.CategorySpendingResponse;
+import com.ryanclu.finance_tracker.dto.response.MonthlySpendingResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 @Repository
 public class TransactionStatsRepository {
@@ -16,7 +17,9 @@ public class TransactionStatsRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public List<Map<String, Object>> getSpendingByCategory(Long userId, LocalDate startDate, LocalDate endDate) {
+    public List<CategorySpendingResponse> getSpendingByCategory(Long userId,
+                                                                LocalDate startDate,
+                                                                LocalDate endDate) {
         String sql = """
                 SELECT c.name AS category_name, SUM(t.amount) AS total_amount
                 FROM transactions t
@@ -28,10 +31,19 @@ public class TransactionStatsRepository {
                 ORDER BY total_amount DESC
                 """;
 
-        return jdbcTemplate.queryForList(sql, userId, startDate, endDate);
+        // RowMapper lambda — called once per row in the result set.
+        // rs (ResultSet) gives access to column values by name.
+        // rowNum is the current row index (we don't need it here but
+        // the interface requires it).
+        return jdbcTemplate.query(sql, (rs, rowNum) -> new CategorySpendingResponse(
+                rs.getString("category_name"),
+                rs.getBigDecimal("total_amount")
+        ), userId, startDate, endDate);
     }
 
-    public List<Map<String, Object>> getMonthlySpendingTrend(Long userId, LocalDate startDate, LocalDate endDate) {
+    public List<MonthlySpendingResponse> getMonthlySpendingTrend(Long userId,
+                                                                 LocalDate startDate,
+                                                                 LocalDate endDate) {
         String sql = """
                 SELECT DATE_TRUNC('month', t.transaction_date) AS month,
                        SUM(t.amount) AS total_amount
@@ -43,9 +55,82 @@ public class TransactionStatsRepository {
                 ORDER BY month ASC
                 """;
 
-        return jdbcTemplate.queryForList(sql, userId, startDate, endDate);
+        return jdbcTemplate.query(sql, (rs, rowNum) -> new MonthlySpendingResponse(
+                rs.getDate("month").toLocalDate(),
+                rs.getBigDecimal("total_amount")
+        ), userId, startDate, endDate);
     }
 }
+
+/*
+
+The SQL is identical — the only change is how we handle the results. Instead of queryForList returning
+loosely-typed maps, we're now using query with a RowMapper lambda that constructs typed DTOs directly.
+
+Walk through the RowMapper for getSpendingByCategory: for each row in the result set, rs.getString("category_name")
+pulls the category name as a String, rs.getBigDecimal("total_amount") pulls the sum as a BigDecimal, and those two
+values get passed into the CategorySpendingResponse constructor. The return type is now List<CategorySpendingResponse>
+instead of List<Map<String, Object>> — fully typed, no casting, and any consumer of this method knows exactly what
+shape the data is in.
+
+For getMonthlySpendingTrend, there's one extra step: rs.getDate("month") returns a java.sql.Date, and we call
+.toLocalDate() to convert it to the java.time.LocalDate that our DTO expects. This is a common pattern when bridging
+between JDBC's older date types and Java's modern java.time API.
+
+ */
+
+
+// PREVIOUS ITERATION BELOW
+
+
+//package com.ryanclu.finance_tracker.repository;
+//
+//import org.springframework.jdbc.core.JdbcTemplate;
+//import org.springframework.stereotype.Repository;
+//
+//import java.time.LocalDate;
+//import java.util.List;
+//import java.util.Map;
+//
+//@Repository
+//public class TransactionStatsRepository {
+//
+//    private final JdbcTemplate jdbcTemplate;
+//
+//    public TransactionStatsRepository(JdbcTemplate jdbcTemplate) {
+//        this.jdbcTemplate = jdbcTemplate;
+//    }
+//
+//    public List<Map<String, Object>> getSpendingByCategory(Long userId, LocalDate startDate, LocalDate endDate) {
+//        String sql = """
+//                SELECT c.name AS category_name, SUM(t.amount) AS total_amount
+//                FROM transactions t
+//                JOIN categories c ON t.category_id = c.id
+//                WHERE t.user_id = ?
+//                  AND t.transaction_date BETWEEN ? AND ?
+//                  AND t.transaction_type = 'EXPENSE'
+//                GROUP BY c.name
+//                ORDER BY total_amount DESC
+//                """;
+//
+//        return jdbcTemplate.queryForList(sql, userId, startDate, endDate);
+//    }
+//
+//    public List<Map<String, Object>> getMonthlySpendingTrend(Long userId, LocalDate startDate, LocalDate endDate) {
+//        String sql = """
+//                SELECT DATE_TRUNC('month', t.transaction_date) AS month,
+//                       SUM(t.amount) AS total_amount
+//                FROM transactions t
+//                WHERE t.user_id = ?
+//                  AND t.transaction_date BETWEEN ? AND ?
+//                  AND t.transaction_type = 'EXPENSE'
+//                GROUP BY DATE_TRUNC('month', t.transaction_date)
+//                ORDER BY month ASC
+//                """;
+//
+//        return jdbcTemplate.queryForList(sql, userId, startDate, endDate);
+//    }
+//}
 
 /*
 
